@@ -250,7 +250,7 @@ long calculate_length(long x, long y, long z) {
   y = abs(y);  //やりたくね？
   z = abs(z);
 
-  long length = (long)((sqrt((double)x * (double)x + (double)y * (double)y+(double)z * (double)z) + 0.5); //sqrtはdoubleで計算する必要あり、それに0.5を足して四捨五入、そのうえでlong型に丸め込んでいる。
+  long length = (long)(sqrt((double)x * (double)x + (double)y * (double)y+(double)z * (double)z) + 0.5); //sqrtはdoubleで計算する必要あり、それに0.5を足して四捨五入、そのうえでlong型に丸め込んでいる。
   length = (long)((float)length * 9.6);
 }
 
@@ -268,6 +268,7 @@ void setup() {
   // get the status of Trasnmitted packet
   esp_now_register_send_cb(OnDataSent);
 }
+void target_
 
 void loop() {
     // In the loop we scan for slave

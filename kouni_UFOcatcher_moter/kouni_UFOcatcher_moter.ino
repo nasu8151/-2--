@@ -48,11 +48,11 @@
 #include <esp_wifi.h>
 
 #define CHANNEL 1
-#define SLAVENUM 1  // Slave番号。0ならMasterのdata0を、3ならMasterのdata3を受信する
+#define SLAVENUM 2  // Slave番号。0ならMasterのdata0を、3ならMasterのdata3を受信する
 
 //PID
-#define PWM     4
-#define PWM1    5
+#define PWM 4
+#define PWM1 5
 #define PHASE_A 6
 #define PHASE_B 7
 
@@ -63,19 +63,20 @@ long target = 0;
 
 long prevMillis = 0;
 unsigned long prevMicros = 0;
+unsigned long pretime_receive;  //前回の通信
 
 const float KP = 20.0f;
 const float KI = 2.0f;
 const float KD = 18.0f;
 
 float I = 0.0f;
-long  prevP = 0.0f;
+long prevP = 0.0f;
 
-String inputBuffer = "";   // 入力バッファ
-bool inputReady = false;   // 1行読み込み完了フラグ
+String inputBuffer = "";  // 入力バッファ
+bool inputReady = false;  // 1行読み込み完了フラグ
 bool isUsingSerial = false;
 
-bool data_received_flag =false;
+bool data_received_flag = false;
 
 void IRAM_ATTR HandlePhaseA() {
   if (digitalRead(PHASE_B) == 0) {
@@ -93,19 +94,20 @@ void setup() {
   // configure device AP mode
   configDeviceAP();
   // This is the mac address of the Slave in AP Mode
-  Serial.print("AP MAC: "); Serial.println(WiFi.softAPmacAddress());
+  Serial.print("AP MAC: ");
+  Serial.println(WiFi.softAPmacAddress());
   // Init ESPNow with a fallback logic
   InitESPNow();
   // Once ESPNow is successfully Init, we will register for recv CB to
   // get recv packer info.
   esp_now_register_recv_cb(OnDataRecv);
 
-    // initialize digital pin led as an output
+  // initialize digital pin led as an output
   pinMode(PWM, OUTPUT);
   pinMode(PWM1, OUTPUT);
   pinMode(PHASE_A, INPUT);
   pinMode(PHASE_B, INPUT);
-  
+
   ledcSetup(0, 25000, 8);
   ledcAttachPin(PWM, 0);
   ledcSetup(1, 25000, 8);
@@ -113,13 +115,17 @@ void setup() {
 
   attachInterrupt(digitalPinToInterrupt(PHASE_A), HandlePhaseA, RISING);
   // attachInterrupt(digitalPinToInterrupt(PHASE_B), HandlePhaseB, RISING);
-  inputBuffer.reserve(32); // メモリを事前確保（長い数にも対応）
+  inputBuffer.reserve(32);  // メモリを事前確保（長い数にも対応）
+  pretime_receive = millis();
 }
 
 void loop() {
-  if(data_received_flag){
+  if (data_received_flag) {
+    pretime_receive = millis();
     PID_move(target);
     data_received_flag = false;
+  } else if (millis() - pretime_receive > 500) {  //0.5秒通信がなかったら。
+    PID_move(0);
   }
 }
 
@@ -132,19 +138,20 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int data_len) {
   char macStr[18];
   snprintf(macStr, sizeof(macStr), "%02x:%02x:%02x:%02x:%02x:%02x",
            mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
-  Serial.print("Last Packet Recv from: "); Serial.println(macStr);
-  Serial.print("Last Packet Recv Data: "); 
+  Serial.print("Last Packet Recv from: ");
+  Serial.println(macStr);
+  Serial.print("Last Packet Recv Data: ");
   long recieveddata = (data[0 + SLAVENUM * 4] << 24) + (data[1 + SLAVENUM * 4] << 16) + (data[2 + SLAVENUM * 4] << 8) + (data[3 + SLAVENUM * 4] << 0);
   for (int i = 0; i < sizeof(data); i++) {
-    Serial.print(data[i]); Serial.print(", ");
+    Serial.print(data[i]);
+    Serial.print(", ");
   }
   Serial.println("");
   Serial.println(recieveddata);
 
-target = recieveddata;
+  target = recieveddata;
 
-  data_received_flag = true;//メインループ用にフラグを立てる
-
+  data_received_flag = true;  //メインループ用にフラグを立てる
 }
 
 // Init ESP Now with fallback
@@ -152,8 +159,7 @@ void InitESPNow() {
   WiFi.disconnect();
   if (esp_now_init() == ESP_OK) {
     Serial.println("ESPNow Init Success");
-  }
-  else {
+  } else {
     Serial.println("ESPNow Init Failed");
     // Retry InitESPNow, add a counte and then restart?
     // InitESPNow();
@@ -179,12 +185,12 @@ void configDeviceAP() {
   esp_wifi_set_channel(CHANNEL, WIFI_SECOND_CHAN_NONE);
 }
 
-void PID_move(long target_val){
-    unsigned long t = micros();
+void PID_move(long target_val) {
+  unsigned long t = micros();
   float dt = (t - prevMicros) / 1000000.0f;
-  long  P =  target_val - counter;
-        I += (float)P * dt;
-  float D =  (float)(P - prevP) / dt;
+  long P = target_val - counter;
+  I += (float)P * dt;
+  float D = (float)(P - prevP) / dt;
 
   prevMicros = t;
   prevP = P;
@@ -193,18 +199,17 @@ void PID_move(long target_val){
   I = CLIP(I, 2000.0f);
 
   if (ledcVal > 0) {
-    ledcWrite(1, 0);
-    ledcWrite(0, ledcVal);
-  } else {
-    ledcWrite(1, -ledcVal);
     ledcWrite(0, 0);
+    ledcWrite(1, ledcVal);
+  } else {
+    ledcWrite(0, -ledcVal);
+    ledcWrite(1, 0);
   }
-/*
+  /*
   if (millis() - prevMillis > 20 && !isUsingSerial) {
     Serial.printf("target:%d, counter:%d, speed:%d, I:%.1f, D:%.3f\r\n", target, counter, ledcVal, I, D);
     prevMillis = millis();
   }
   */
   delay(2);
-
 }
