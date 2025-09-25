@@ -174,7 +174,6 @@ void manageSlave() {
 
 // send data
 void sendData() {
-  data1++;
   uint8_t data[16] = {(uint8_t)(data0 >> 24), (uint8_t)(data0 >> 16), (uint8_t)(data0 >> 8), (uint8_t)(data0 >> 0), 
                       (uint8_t)(data1 >> 24), (uint8_t)(data1 >> 16), (uint8_t)(data1 >> 8), (uint8_t)(data1 >> 0),
                       (uint8_t)(data2 >> 24), (uint8_t)(data2 >> 16), (uint8_t)(data2 >> 8), (uint8_t)(data2 >> 0),

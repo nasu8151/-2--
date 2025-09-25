@@ -268,7 +268,12 @@ void setup() {
   // get the status of Trasnmitted packet
   esp_now_register_send_cb(OnDataSent);
 }
-void target_
+
+void get_target() {
+  target_x = 0;
+  target_y = 0;
+  target_z = 1000;
+}
 
 void loop() {
     // In the loop we scan for slave
@@ -276,6 +281,7 @@ void loop() {
 
     if (SlaveCnt > 0) {  // check if slave channel is defined
       manageSlave();
+      get_target();
       calculate_data_to_send();
       sendData(data0, data1, data2, data3);
     } else {
