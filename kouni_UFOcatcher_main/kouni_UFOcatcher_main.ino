@@ -40,9 +40,9 @@ long data1;
 long data2;
 long data3;
 
-int target_x;
-int target_y;
-int target_z;
+int target_x = 0;
+int target_y = 0;
+int target_z = 180;
 
 #define CHANNEL 1
 #define PRINTSCANRESULTS 0
@@ -232,16 +232,16 @@ void calculate_data_to_send() {
   const int catcher_center_adjust_y = abs(36);  //アームの中心からワイヤ固定点までの距離
 
   const int catcher_height_adjust_z = 180;  //一番おろした時の地面からワイヤ固定点までの高さ
-    const long default_length = calculate_length(frame_x - catcher_center_adjust_x, frame_y - catcher_center_adjust_y, frame_z - catcher_center_adjust_z);
+  const long default_length = calculate_length(frame_x - catcher_center_adjust_x, frame_y - catcher_center_adjust_y, frame_z - catcher_height_adjust_z);
 
   //data0
-  data0 = default_length - calculate_length(-frame_x - (target_x - catcher_center_adjust_x), frame_y - (target_y + catcher_center_adjust_x), 1300 - target_z);
+  data0 = calculate_length(-frame_x - (target_x - catcher_center_adjust_x), frame_y - (target_y + catcher_center_adjust_x), 1300 - target_z) - default_length;
   //data1
-  data1 = default_length - calculate_length(frame_x - (target_x + catcher_center_adjust_x), frame_y - (target_y + catcher_center_adjust_x), 1300 - target_z);
+  data1 = calculate_length(frame_x - (target_x + catcher_center_adjust_x), frame_y - (target_y + catcher_center_adjust_x), 1300 - target_z) - default_length;
   //data2
-  data2 = default_length - calculate_length(frame_x - (target_x + catcher_center_adjust_x), -frame_y - (target_y - catcher_center_adjust_x), 1300 - target_z);
+  data2 = calculate_length(frame_x - (target_x + catcher_center_adjust_x), -frame_y - (target_y - catcher_center_adjust_x), 1300 - target_z) - default_length;
   //data3
-  data3 = default_length - calculate_length(-frame_x - (target_x - catcher_center_adjust_x), -frame_y - (target_y - catcher_center_adjust_x), 1300 - target_z);
+  data3 = calculate_length(-frame_x - (target_x - catcher_center_adjust_x), -frame_y - (target_y - catcher_center_adjust_x), 1300 - target_z) - default_length;
 }
 
 long calculate_length(long x, long y, long z) {
@@ -252,7 +252,6 @@ long calculate_length(long x, long y, long z) {
 
   long length = (long)((sqrt((double)x * (double)x + (double)y * (double)y+(double)z * (double)z) + 0.5); //sqrtはdoubleで計算する必要あり、それに0.5を足して四捨五入、そのうえでlong型に丸め込んでいる。
   length = (long)((float)length * 9.6);
-long void initCatcher() {
 }
 
 void setup() {
@@ -272,9 +271,6 @@ void setup() {
 
 void loop() {
     // In the loop we scan for slave
-    target_x = 0;
-    target_y = 0;
-    target_z = 80;
     ScanForSlave();
 
     if (SlaveCnt > 0) {  // check if slave channel is defined

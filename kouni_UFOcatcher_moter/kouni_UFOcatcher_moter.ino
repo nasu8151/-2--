@@ -48,7 +48,7 @@
 #include <esp_wifi.h>
 
 #define CHANNEL 1
-#define SLAVENUM 2 // Slave番号。0ならMasterのdata0を、3ならMasterのdata3を受信する
+#define SLAVENUM 1  // Slave番号。0ならMasterのdata0を、3ならMasterのdata3を受信する
 
 //PID
 #define PWM     4
