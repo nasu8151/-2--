@@ -48,7 +48,7 @@
 #include <esp_wifi.h>
 
 #define CHANNEL 1
-#define SLAVENUM 2  // Slave番号。0ならMasterのdata0を、3ならMasterのdata3を受信する
+#define SLAVENUM 3  // Slave番号。0ならMasterのdata0を、3ならMasterのdata3を受信する
 
 //PID
 #define PWM 4
@@ -120,9 +120,9 @@ void setup() {
 }
 
 void loop() {
+  PID_move(target);
   if (data_received_flag) {
     pretime_receive = millis();
-    PID_move(target);
     data_received_flag = false;
   }
 /*
@@ -145,7 +145,7 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int data_len) {
   Serial.println(macStr);
   Serial.print("Last Packet Recv Data: ");
   long recieveddata = (data[0 + SLAVENUM * 4] << 24) + (data[1 + SLAVENUM * 4] << 16) + (data[2 + SLAVENUM * 4] << 8) + (data[3 + SLAVENUM * 4] << 0);
-  for (int i = 0; i < sizeof(data); i++) {
+  for (int i = 0; i < data_len; i++) {
     Serial.print(data[i]);
     Serial.print(", ");
   }
