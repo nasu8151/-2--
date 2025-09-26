@@ -159,6 +159,7 @@ void sendData(long data_send_0, long data_send_1, long data_send_2, long data_se
                        (uint8_t)(data_send_1 >> 24), (uint8_t)(data_send_1 >> 16), (uint8_t)(data_send_1 >> 8), (uint8_t)(data_send_1 >> 0),
                        (uint8_t)(data_send_2 >> 24), (uint8_t)(data_send_2 >> 16), (uint8_t)(data_send_2 >> 8), (uint8_t)(data_send_2 >> 0),
                        (uint8_t)(data_send_3 >> 24), (uint8_t)(data_send_3 >> 16), (uint8_t)(data_send_3 >> 8), (uint8_t)(data_send_3 >> 0) };
+  Serial.println(SlaveCnt);
   for (int i = 0; i < SlaveCnt; i++) {
     const uint8_t *peer_addr = slaves[i].peer_addr;
     if (i == 0) {  // print only for first slave
@@ -266,5 +267,5 @@ void loop() {
     }
 
     // wait for 3seconds to run the logic again
-    delay(100);
+    delay(1000);
 }

@@ -208,11 +208,11 @@ void PID_move(long target_val) {
     ledcWrite(0, -ledcVal);
     ledcWrite(1, 0);
   }
-  
+  /*
   if (millis() - prevMillis > 20 && !isUsingSerial) {
     Serial.printf("target:%d, counter:%d, speed:%d, I:%.1f, D:%.3f\r\n", target, counter, ledcVal, I, D);
     prevMillis = millis();
   }
-  
+  */
   delay(2);
 }
