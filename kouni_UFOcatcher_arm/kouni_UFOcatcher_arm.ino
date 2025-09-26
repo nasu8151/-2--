@@ -46,33 +46,10 @@
 #include <esp_now.h>
 #include <WiFi.h>
 #include <esp_wifi.h>
+#include <ESP32Servo.h>
 
 #define CHANNEL 1
-#define SLAVENUM 2  // Slave番号。0ならMasterのdata0を、3ならMasterのdata3を受信する
 
-//PID
-#define PWM 4
-#define PWM1 5
-#define PHASE_A 6
-#define PHASE_B 7
-
-#define MAXIMUM_SPEED 180L
-
-#define CLIP(X, M) (X) > 0 ? MIN((X), (M)) : MAX((X), -(M))
-
-volatile long counter;
-long target = 0;
-
-long prevMillis = 0;
-unsigned long prevMicros = 0;
-unsigned long pretime_receive;  //前回の通信
-
-const float KP = 20.0f;
-const float KI = 2.0f;
-const float KD = 18.0f;
-
-float I = 0.0f;
-long prevP = 0.0f;
 
 String inputBuffer = "";  // 入力バッファ
 bool inputReady = false;  // 1行読み込み完了フラグ
@@ -80,13 +57,18 @@ bool isUsingSerial = false;
 
 bool data_received_flag = false;
 
-void IRAM_ATTR HandlePhaseA() {
-  if (digitalRead(PHASE_B) == 0) {
-    counter++;
-  } else {
-    counter--;
-  }
-}
+uint8_t arm_state = 0;
+bool open_or_close = false;  //false = 閉じる
+
+#define SERVO_PIN_L D1
+#define SERVO_PIN_R D0
+
+const int close_degree = 10;
+const int open_degree = 35;
+
+Servo servo_L;
+Servo servo_R;
+
 
 void setup() {
   Serial.begin(115200);
@@ -103,31 +85,44 @@ void setup() {
   // Once ESPNow is successfully Init, we will register for recv CB to
   // get recv packer info.
   esp_now_register_recv_cb(OnDataRecv);
+  servo_L.attach(SERVO_PIN_L);
+  servo_R.attach(SERVO_PIN_R);
 
   // initialize digital pin led as an output
-  pinMode(PWM, OUTPUT);
-  pinMode(PWM1, OUTPUT);
-  pinMode(PHASE_A, INPUT);
-  pinMode(PHASE_B, INPUT);
-
-  ledcSetup(0, 25000, 8);
-  ledcAttachPin(PWM, 0);
-  ledcSetup(1, 25000, 8);
-  ledcAttachPin(PWM1, 1);
-
-  attachInterrupt(digitalPinToInterrupt(PHASE_A), HandlePhaseA, RISING);
-  // attachInterrupt(digitalPinToInterrupt(PHASE_B), HandlePhaseB, RISING);
   inputBuffer.reserve(32);  // メモリを事前確保（長い数にも対応）
-  pretime_receive = millis();
+
+  servo_L.write(90 - close_degree);
+  servo_R.write(90 + close_degree);
+  open_or_close = false;
 }
 
 void loop() {
-  PID_move(target);
+  
   if (data_received_flag) {
-    pretime_receive = millis();
+    if (arm_state != open_or_close) {  //受け取った信号と状態が違ったら
+
+      if (arm_state == false) {
+        for (int i = open_degree; i > close_degree; i--) {
+          servo_L.write(90 - i);
+          servo_R.write(90 + i);
+          delay(20);
+        }
+        open_or_close = false;
+
+      } else {
+         for (int i = close_degree; i < open_degree; i++) {
+          servo_L.write(90 - i);
+          servo_R.write(90 + i);
+          delay(20);
+        }
+        open_or_close = true;
+
+      }
+    }
+    Serial.println(arm_state);
     data_received_flag = false;
   }
-/*
+  /*
  else if (millis() - pretime_receive > 500) {  //0.5秒通信がなかったら。
     PID_move(0);
   }
@@ -146,7 +141,7 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int data_len) {
   Serial.print("Last Packet Recv from: ");
   Serial.println(macStr);
   Serial.print("Last Packet Recv Data: ");
-  long recieveddata = (data[0 + SLAVENUM * 4] << 24) + (data[1 + SLAVENUM * 4] << 16) + (data[2 + SLAVENUM * 4] << 8) + (data[3 + SLAVENUM * 4] << 0);
+  uint8_t recieveddata = data[16];
   for (int i = 0; i < data_len; i++) {
     Serial.print(data[i]);
     Serial.print(", ");
@@ -154,7 +149,7 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int data_len) {
   Serial.println("");
   Serial.println(recieveddata);
 
-  target = recieveddata;
+  arm_state = recieveddata;
 
   data_received_flag = true;  //メインループ用にフラグを立てる
 }
@@ -188,33 +183,4 @@ void configDeviceAP() {
 
   // STAモードのチャンネルも合わせる（重要）
   esp_wifi_set_channel(CHANNEL, WIFI_SECOND_CHAN_NONE);
-}
-
-void PID_move(long target_val) {
-  unsigned long t = micros();
-  float dt = (t - prevMicros) / 1000000.0f;
-  long P = target_val - counter;
-  I += (float)P * dt;
-  float D = (float)(P - prevP) / dt;
-
-  prevMicros = t;
-  prevP = P;
-
-  long ledcVal = CLIP(P * KP + I * KI, MAXIMUM_SPEED);
-  I = CLIP(I, 2000.0f);
-
-  if (ledcVal > 0) {
-    ledcWrite(0, 0);
-    ledcWrite(1, ledcVal);
-  } else {
-    ledcWrite(0, -ledcVal);
-    ledcWrite(1, 0);
-  }
-  /*
-  if (millis() - prevMillis > 20 && !isUsingSerial) {
-    Serial.printf("target:%d, counter:%d, speed:%d, I:%.1f, D:%.3f\r\n", target, counter, ledcVal, I, D);
-    prevMillis = millis();
-  }
-  */
-  delay(2);
 }

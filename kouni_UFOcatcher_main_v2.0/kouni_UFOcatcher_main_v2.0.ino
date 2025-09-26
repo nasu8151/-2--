@@ -54,11 +54,16 @@
 #define NUMSLAVES 20
 esp_now_peer_info_t slaves[NUMSLAVES] = {};
 int SlaveCnt = 0;
+unsigned long pretime_loop;
+bool bottonC = false;
+bool pre_bottonC = false;
 
 long data0;  // 送りたいデータの例
 long data1;
 long data2;
 long data3;
+
+uint8_t arm_state = 0;
 
 int target_x = 0;
 int target_y = 0;
@@ -66,6 +71,12 @@ int target_z = 180;  //mmだと180
 
 #define CHANNEL 1
 #define PRINTSCANRESULTS 0
+
+#define JOYSTICK_PIN_X 35
+#define JOYSTICK_PIN_Y 34
+#define BOTTON_A 13
+#define BOTTON_B 21
+#define BOTTON_C 33
 
 // Init ESP Now with fallback
 void InitESPNow() {
@@ -199,10 +210,11 @@ void manageSlave() {
 
 // send data
 void sendData() {
-  uint8_t data[16] = { (uint8_t)(data0 >> 24), (uint8_t)(data0 >> 16), (uint8_t)(data0 >> 8), (uint8_t)(data0 >> 0),
+  uint8_t data[17] = { (uint8_t)(data0 >> 24), (uint8_t)(data0 >> 16), (uint8_t)(data0 >> 8), (uint8_t)(data0 >> 0),
                        (uint8_t)(data1 >> 24), (uint8_t)(data1 >> 16), (uint8_t)(data1 >> 8), (uint8_t)(data1 >> 0),
                        (uint8_t)(data2 >> 24), (uint8_t)(data2 >> 16), (uint8_t)(data2 >> 8), (uint8_t)(data2 >> 0),
-                       (uint8_t)(data3 >> 24), (uint8_t)(data3 >> 16), (uint8_t)(data3 >> 8), (uint8_t)(data3 >> 0) };
+                       (uint8_t)(data3 >> 24), (uint8_t)(data3 >> 16), (uint8_t)(data3 >> 8), (uint8_t)(data3 >> 0),
+                       (uint8_t)(arm_state) };
   for (int i = 0; i < SlaveCnt; i++) {
     const uint8_t *peer_addr = slaves[i].peer_addr;
     if (i == 0) {  // print only for first slave
@@ -244,7 +256,7 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
 
 void calculate_data_to_send() {
   //桁がえぐいことなってまうからmmが最小単位
-  Serial.println("start culclating");
+  // Serial.println("start culclating");
 
   const int frame_x = 1280 / 2;  //mmだと1300
   const int frame_y = 1280 / 2;  //mmだと1300
@@ -254,20 +266,20 @@ void calculate_data_to_send() {
   const int catcher_center_adjust_y = abs(36);  //mmだと36  //アームの中心からワイヤ固定点までの距離
 
   const int catcher_height_adjust_z = 180;  //mmだと180  //一番おろした時の地面からワイヤ固定点までの高さ
-  Serial.println("defalt cuculate");
+  // Serial.println("defalt cuculate");
   const long default_length = calculate_length(frame_x - catcher_center_adjust_x, frame_y - catcher_center_adjust_y, frame_z - catcher_height_adjust_z);
 
   //data0
-  Serial.println("data0 culclating");
+  // Serial.println("data0 culclating");
   data0 = calculate_length(-frame_x - (target_x - catcher_center_adjust_x), frame_y - (target_y + catcher_center_adjust_x), frame_z - target_z) - default_length;
   //data1
-  Serial.println("data1 culclating");
+  // Serial.println("data1 culclating");
   data1 = calculate_length(frame_x - (target_x + catcher_center_adjust_x), frame_y - (target_y + catcher_center_adjust_x), frame_z - target_z) - default_length;
   //data2
-  Serial.println("data2 culclating");
+  // Serial.println("data2 culclating");
   data2 = calculate_length(frame_x - (target_x + catcher_center_adjust_x), -frame_y - (target_y - catcher_center_adjust_x), frame_z - target_z) - default_length;
   //data3
-  Serial.println("data3 culclating");
+  // Serial.println("data3 culclating");
   data3 = calculate_length(-frame_x - (target_x - catcher_center_adjust_x), -frame_y - (target_y - catcher_center_adjust_x), frame_z - target_z) - default_length;
 
   /*
@@ -276,6 +288,7 @@ void calculate_data_to_send() {
   data2 = -1000;
   data3 = -1000;
   */
+  /*
   Serial.print("default_length: ");
   Serial.println(default_length);
   Serial.print("data0: ");
@@ -286,11 +299,12 @@ void calculate_data_to_send() {
   Serial.println(data2);
   Serial.print("data3: ");
   Serial.println(data3);
+  */
 }
 
 long calculate_length(long x, long y, long z) {
 
-  Serial.println("culclate length");
+  // Serial.println("culclate length");
 
   long length = (long)(sqrt((double)x * (double)x + (double)y * (double)y + (double)z * (double)z) + 0.5);  //sqrtはdoubleで計算する必要あり、それに0.5を足して四捨五入、そのうえでlong型に丸め込んでいる。
   // length = length * 181; cmの場合
@@ -313,10 +327,13 @@ void get_target() {
     int index1 = input.indexOf(',');
     int index2 = input.indexOf(',', index1 + 1);
 
-    if (index1 > 0 && index2 > 0 ) {
+    if (index1 > 0 && index2 > 0) {
       target_x = input.substring(0, index1).toInt();
       target_y = input.substring(index1 + 1, index2).toInt();
       target_z = input.substring(index2 + 1).toInt();
+      target_x = constrain(target_x, -500, 500);
+      target_y = constrain(target_y, -500, 500);
+      // target_z = constrain(target_z, 180, 1200);
 
       // 確認用に出力
       Serial.print("target_x = ");
@@ -327,6 +344,51 @@ void get_target() {
       Serial.println(target_z);
     }
   }
+}
+void get_joystick() {
+  int x;
+  int y;
+  int z = 0;
+  x = -(analogRead(JOYSTICK_PIN_X) - 2000);
+  y = analogRead(JOYSTICK_PIN_Y) - 1740;
+  x = (int)((float)x * 0.013 * 2);
+  y = (int)((float)y * 0.015) * 2;
+  x = constrain(x, -40, 40);
+  y = constrain(y, -40, 40);
+  if (x > -8 && x < 8) {
+    x = 0;
+  }
+  if (y > -8 && y < 8) {
+    y = 0;
+  }
+
+  if (digitalRead(BOTTON_A) != digitalRead(BOTTON_B)) {
+    if (digitalRead(BOTTON_A) == false) {  //Aが押されたら
+      z = 40;
+    } else {  //Bが押されたら
+      z = -40;
+    }
+  }
+
+  target_x += x;
+  target_y += y;
+  target_z += z;
+
+  // Serial.print(x);
+  // Serial.print("  ");
+  // Serial.println(y);
+  // Serial.println("");
+  Serial.print(digitalRead(BOTTON_A));
+  Serial.print("  ");
+  Serial.println(digitalRead(BOTTON_B));
+  Serial.println("");
+
+  // Serial.print(target_x);
+  // Serial.print("  ");
+  // Serial.print(target_y);
+  //  Serial.print("  ");
+  // Serial.println(target_z);
+  // Serial.println("");
 }
 
 void setup() {
@@ -342,26 +404,57 @@ void setup() {
   // Once ESPNow is successfully Init, we will register for Send CB to
   // get the status of Trasnmitted packet
   esp_now_register_send_cb(OnDataSent);
+  ScanForSlave();
+
+  pinMode(BOTTON_A, INPUT_PULLUP);
+  pinMode(BOTTON_B, INPUT_PULLUP);
+  pinMode(BOTTON_C, INPUT_PULLUP);
+
+  pretime_loop - millis();
+
+  target_z = 500;
 }
 
 void loop() {
   // In the loop we scan for slave
-  ScanForSlave();
+  bottonC = digitalRead(BOTTON_C);
+
+  if (bottonC != pre_bottonC) {  //前回のループと違えば
+    if (bottonC == false) {      //押されてたら
+      if (arm_state == 0) {
+        arm_state = 1;
+      } else {
+        arm_state = 0;
+      }
+    }
+  }
+  pre_bottonC = bottonC;
+  delay(1);
+
+
   // If Slave is found, it would be populate in `slave` variable
   // We will check if `slave` is defined and then we proceed further
-  if (SlaveCnt > 0) {  // check if slave channel is defined
-    // `slave` is defined
-    // Add slave as peer if it has not been added already
-    manageSlave();
-    // pair success or already paired
-    // Send data to device
-    sendData();
-  } else {
-    // No slave found to process
-  }
-  get_target();
-  calculate_data_to_send();
+  if (millis() - pretime_loop > 100) {
+    if (SlaveCnt > 0) {  // check if slave channel is defined
+      // `slave` is defined
+      // Add slave as peer if it has not been added already
+      manageSlave();
+      // pair success or already paired
+      // Send data to device
 
-  // wait for 3seconds to run the logic again
-  delay(100);
+      sendData();
+
+    } else {
+      // No slave found to process
+      ScanForSlave();
+    }
+
+
+    // get_target();
+    get_joystick();
+    calculate_data_to_send();
+
+    // wait for 3seconds to run the logic again
+    pretime_loop = millis();
+  }
 }
