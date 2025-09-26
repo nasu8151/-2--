@@ -111,49 +111,6 @@ void ScanForSlave() {
   WiFi.scanDelete();
 }
 
-
-// Check if the slave is already paired with the master.
-// If not, pair the slave with master
-  if (SlaveCnt > 0) {
-    for (int i = 0; i < SlaveCnt; i++) {
-      Serial.print("Processing: ");
-      for (int ii = 0; ii < 6; ++ii) {
-        Serial.print((uint8_t)slaves[i].peer_addr[ii], HEX);
-        if (ii != 5) Serial.print(":");
-      }
-      Serial.print(" Status: ");
-      // check if the peer exists
-      bool exists = esp_now_is_peer_exist(slaves[i].peer_addr);
-      if (exists) {
-        // Slave already paired.
-        Serial.println("Already Paired");
-      } else {
-        // Slave not paired, attempt pair
-        esp_err_t addStatus = esp_now_add_peer(&slaves[i]);
-        if (addStatus == ESP_OK) {
-          // Pair success
-          Serial.println("Pair success");
-        } else if (addStatus == ESP_ERR_ESPNOW_NOT_INIT) {
-          // How did we get so far!!
-          Serial.println("ESPNOW Not Init");
-        } else if (addStatus == ESP_ERR_ESPNOW_ARG) {
-          Serial.println("Add Peer - Invalid Argument");
-        } else if (addStatus == ESP_ERR_ESPNOW_FULL) {
-          Serial.println("Peer list full");
-        } else if (addStatus == ESP_ERR_ESPNOW_NO_MEM) {
-          Serial.println("Out of memory");
-        } else if (addStatus == ESP_ERR_ESPNOW_EXIST) {
-          Serial.println("Peer Exists");
-        } else {
-          Serial.println("Not sure what happened");
-        }
-        delay(100);
-      }
-    }
-  } else {
-    // No slave found to process
-    Serial.println("No Slave found to process");
-  }
 void manageSlave() {
   if (SlaveCnt > 0) {
     for (int i = 0; i < SlaveCnt; i++) {
