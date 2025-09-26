@@ -62,7 +62,7 @@ long data3;
 
 int target_x = 0;
 int target_y = 0;
-int target_z = 180;
+int target_z = 180;  //mmだと180
 
 #define CHANNEL 1
 #define PRINTSCANRESULTS 0
@@ -244,40 +244,89 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
 
 void calculate_data_to_send() {
   //桁がえぐいことなってまうからmmが最小単位
-  const int frame_x = 1300 / 2;
-  const int frame_y = 1300 / 2;
-  const int frame_z = 1300;
+  Serial.println("start culclating");
 
-  const int catcher_center_adjust_x = abs(36);  //absにする必要はないけどわかりやすいからやってる。
-  const int catcher_center_adjust_y = abs(36);  //アームの中心からワイヤ固定点までの距離
+  const int frame_x = 1280 / 2;  //mmだと1300
+  const int frame_y = 1280 / 2;  //mmだと1300
+  const int frame_z = 1400;      //mmだと1300
 
-  const int catcher_height_adjust_z = 180;  //一番おろした時の地面からワイヤ固定点までの高さ
+  const int catcher_center_adjust_x = abs(36);  //mmだと36  //absにする必要はないけどわかりやすいからやってる。
+  const int catcher_center_adjust_y = abs(36);  //mmだと36  //アームの中心からワイヤ固定点までの距離
+
+  const int catcher_height_adjust_z = 180;  //mmだと180  //一番おろした時の地面からワイヤ固定点までの高さ
+  Serial.println("defalt cuculate");
   const long default_length = calculate_length(frame_x - catcher_center_adjust_x, frame_y - catcher_center_adjust_y, frame_z - catcher_height_adjust_z);
 
   //data0
-  data0 = calculate_length(-frame_x - (target_x - catcher_center_adjust_x), frame_y - (target_y + catcher_center_adjust_x), 1300 - target_z) - default_length;
+  Serial.println("data0 culclating");
+  data0 = calculate_length(-frame_x - (target_x - catcher_center_adjust_x), frame_y - (target_y + catcher_center_adjust_x), frame_z - target_z) - default_length;
   //data1
-  data1 = calculate_length(frame_x - (target_x + catcher_center_adjust_x), frame_y - (target_y + catcher_center_adjust_x), 1300 - target_z) - default_length;
+  Serial.println("data1 culclating");
+  data1 = calculate_length(frame_x - (target_x + catcher_center_adjust_x), frame_y - (target_y + catcher_center_adjust_x), frame_z - target_z) - default_length;
   //data2
-  data2 = calculate_length(frame_x - (target_x + catcher_center_adjust_x), -frame_y - (target_y - catcher_center_adjust_x), 1300 - target_z) - default_length;
+  Serial.println("data2 culclating");
+  data2 = calculate_length(frame_x - (target_x + catcher_center_adjust_x), -frame_y - (target_y - catcher_center_adjust_x), frame_z - target_z) - default_length;
   //data3
-  data3 = calculate_length(-frame_x - (target_x - catcher_center_adjust_x), -frame_y - (target_y - catcher_center_adjust_x), 1300 - target_z) - default_length;
+  Serial.println("data3 culclating");
+  data3 = calculate_length(-frame_x - (target_x - catcher_center_adjust_x), -frame_y - (target_y - catcher_center_adjust_x), frame_z - target_z) - default_length;
+
+  /*
+  data0 = -1000;
+  data1 = -1000;
+  data2 = -1000;
+  data3 = -1000;
+  */
+  Serial.print("default_length: ");
+  Serial.println(default_length);
+  Serial.print("data0: ");
+  Serial.println(data0);
+  Serial.print("data1: ");
+  Serial.println(data1);
+  Serial.print("data2: ");
+  Serial.println(data2);
+  Serial.print("data3: ");
+  Serial.println(data3);
 }
 
 long calculate_length(long x, long y, long z) {
 
-  x = abs(x);  //二乗するから意味ないけど
-  y = abs(y);  //やりたくね？
-  z = abs(z);
+  Serial.println("culclate length");
 
   long length = (long)(sqrt((double)x * (double)x + (double)y * (double)y + (double)z * (double)z) + 0.5);  //sqrtはdoubleで計算する必要あり、それに0.5を足して四捨五入、そのうえでlong型に丸め込んでいる。
-  length = (long)((float)length * 9.6);
+  // length = length * 181; cmの場合
+
+  length = (long)((float)length * 18.1);
+
+  return length;
 }
 
 void get_target() {
-  target_x = 0;
-  target_y = 0;
-  target_z = 1000;
+  /*
+  target_x = 400;
+  target_y = 400;
+  target_z = 500;
+  */
+  if (Serial.available()) {
+    String input = Serial.readStringUntil('\n');  // 改行まで読み取る
+    input.trim();                                 // 前後の空白や改行を除去
+
+    int index1 = input.indexOf(',');
+    int index2 = input.indexOf(',', index1 + 1);
+
+    if (index1 > 0 && index2 > 0 ) {
+      target_x = input.substring(0, index1).toInt();
+      target_y = input.substring(index1 + 1, index2).toInt();
+      target_z = input.substring(index2 + 1).toInt();
+
+      // 確認用に出力
+      Serial.print("target_x = ");
+      Serial.println(target_x);
+      Serial.print("target_y = ");
+      Serial.println(target_y);
+      Serial.print("target_z = ");
+      Serial.println(target_z);
+    }
+  }
 }
 
 void setup() {
@@ -314,5 +363,5 @@ void loop() {
   calculate_data_to_send();
 
   // wait for 3seconds to run the logic again
-  delay(1000);
+  delay(100);
 }
